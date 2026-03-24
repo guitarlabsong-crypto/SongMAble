@@ -16,10 +16,10 @@
     </style>
 </head>
 <body>
-    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>터치하여 연주 시작</button>
+    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>터치하여 시작</button>
 
     <script>
-        let ball, ballGlow, waterGraphics, tiles, audioCtx;
+        let ball, waterGraphics, ballGlow, tiles, audioCtx;
         let accelX = 0, accelY = 0, baseBeta = null;
 
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -41,21 +41,21 @@
             const centerY = height / 2;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // 1. 나무 나이테 텍스처 생성
+            // 1. 나무 질감 텍스처 생성
             const woodG = this.make.graphics({x: 0, y: 0, add: false});
             woodG.fillStyle(0x8D6E63, 1).fillRect(0, 0, 200, 200);
             for(let i=0; i<200; i+=10) {
                 woodG.lineStyle(1, 0x5D4037, 0.3);
-                woodG.lineBetween(i, 0, i + (Math.random()*12), 200);
+                woodG.lineBetween(i, 0, i + (Math.random()*15), 200);
             }
             woodG.generateTexture('woodTex', 200, 200);
 
-            // 배경 바닥
-            this.add.tileSprite(centerX, centerY, width, height, 'woodTex').setAlpha(0.35);
+            // 배경
+            this.add.tileSprite(centerX, centerY, width, height, 'woodTex').setAlpha(0.3);
 
-            // 2. 워터마크 복구 (상단 중앙)
-            this.add.text(centerX, 40, "SONG, YOUNG-MIN Guitar Lab", {
-                fontSize: '20px', color: '#FF9800', fontStyle: 'bold', alpha: 0.8
+            // 2. 워터마크 (오렌지 컬러)
+            this.add.text(centerX, 50, "SONG, YOUNG-MIN Guitar Lab", {
+                fontSize: '22px', color: '#FF9800', fontStyle: 'bold', alpha: 0.9
             }).setOrigin(0.5);
 
             // 3. 입체 블록 생성
@@ -74,37 +74,33 @@
                 let txt = this.add.text(0, 0, notes[i], { fontSize: (tileSize * 0.3) + 'px', color: '#2D1B18', fontStyle: 'bold' }).setOrigin(0.5);
 
                 container.add([shadow, side, top, txt]);
-                container.setData({ freq: freqs[i], isOver: false, top: top, txt: txt });
+                container.setData({ freq: freqs[i], isOver: false, top, txt });
                 this.physics.add.existing(container);
                 container.body.setSize(tileSize, tileSize);
                 tiles.add(container);
             }
 
-            // 4. 구슬 및 물 그래픽 레이어
+            // 4. 구슬 그래픽 및 물리
             waterGraphics = this.add.graphics().setDepth(101);
-            
-            // 물리용 투명 구슬
-            ball = this.physics.add.sprite(centerX, centerY, null);
-            ball.setCircle(25).setCollideWorldBounds(true).setBounce(0.6).setVisible(false);
-
-            // 구슬의 하이라이트(반사광)
             ballGlow = this.add.graphics().setDepth(102);
 
-            // 30초 셔플
+            ball = this.physics.add.sprite(centerX, centerY, null);
+            ball.setCircle(25).setCollideWorldBounds(true).setBounce(0.5).setVisible(false);
+
             this.time.addEvent({ delay: 30000, callback: shuffleTiles, callbackScope: this, loop: true });
         }
 
         function update() {
             if (ball) {
-                ball.setVelocityX(accelX * 1.5);
-                ball.setVelocityY(accelY * 1.5);
+                ball.setVelocityX(accelX * 1.8);
+                ball.setVelocityY(accelY * 1.8);
 
-                // 구슬 내부의 물 실시간 드로잉
-                drawWaterBall(ball.x, ball.y);
+                // 구슬 내부 물 드로잉 (동기화 보정)
+                drawSyncWater(ball.x, ball.y);
 
                 tiles.getChildren().forEach(container => {
                     const distance = Phaser.Math.Distance.Between(ball.x, ball.y, container.x, container.y);
-                    if (distance < 50) {
+                    if (distance < 48) {
                         if (!container.getData('isOver')) {
                             container.setData('isOver', true);
                             pressButton.call(this, container);
@@ -116,28 +112,30 @@
             }
         }
 
-        function drawWaterBall(x, y) {
+        function drawSyncWater(x, y) {
             waterGraphics.clear();
-            
-            // 1. 구슬 유리 외각
-            waterGraphics.lineStyle(2, 0xffffff, 0.6);
+            ballGlow.clear();
+
+            // 1. 유리 외곽 및 내부 기본광
+            waterGraphics.lineStyle(2, 0xffffff, 0.5);
             waterGraphics.strokeCircle(x, y, 25);
-            waterGraphics.fillStyle(0xffffff, 0.1);
+            waterGraphics.fillStyle(0xffffff, 0.05);
             waterGraphics.fillCircle(x, y, 25);
 
-            // 2. 물 채우기 로직 (중력 방향 계산)
-            let angle = Math.atan2(accelY, accelX);
-            waterGraphics.fillStyle(0x03A9F4, 0.5); // 투명한 푸른 물
+            // 2. 물의 각도 계산 (accelX, accelY의 방향을 반전시켜 중력 방향과 일치시킴)
+            // 구슬이 내려가는 방향(가속도 방향)으로 물이 쏠리도록 보정
+            let targetAngle = Math.atan2(accelY, accelX);
+            
+            waterGraphics.fillStyle(0x0288D1, 0.6); // 물 색상
             waterGraphics.beginPath();
-            // 각도에 맞춰 반원 그리기 (물이 반정도 찬 연출)
-            waterGraphics.arc(x, y, 24, angle, angle + Math.PI, false);
+            // 물이 아래쪽에 고이도록 반원을 그림
+            waterGraphics.arc(x, y, 24, targetAngle, targetAngle + Math.PI, false);
             waterGraphics.closePath();
             waterGraphics.fillPath();
 
-            // 3. 구슬 하이라이트 (고정 위치 반사광)
-            ballGlow.clear();
+            // 3. 유리구슬 상단 반사광 (항상 위쪽에 위치하여 고정된 느낌 부여)
             ballGlow.fillStyle(0xffffff, 0.4);
-            ballGlow.fillCircle(x - 8, y - 8, 6);
+            ballGlow.fillCircle(x - 7, y - 7, 5);
         }
 
         function shuffleTiles() {
@@ -146,7 +144,7 @@
             let pos = [];
             for (let i = 0; i < 12; i++) {
                 let col = i % 3; let row = Math.floor(i / 3);
-                pos.push({ x: (width/2) + (col - 1) * (tileSize * 1.35), y: (height/2) + (row - 1.5) * (tileSize * 1.35) });
+                pos.push({ x: (width/2) + (col-1)*(tileSize*1.35), y: (height/2) + (row-1.5)*(tileSize*1.35) });
             }
             Phaser.Actions.Shuffle(pos);
             tiles.getChildren().forEach((c, i) => {
@@ -186,8 +184,9 @@
         function initSensor() {
             window.addEventListener('deviceorientation', (e) => {
                 if (baseBeta === null) baseBeta = e.beta;
-                accelX = e.gamma * 22; 
-                accelY = (e.beta - baseBeta) * 22;
+                // 감도를 높여 물이 더 빠르게 반응하도록 설정
+                accelX = e.gamma * 25; 
+                accelY = (e.beta - baseBeta) * 25;
             });
         }
     </script>

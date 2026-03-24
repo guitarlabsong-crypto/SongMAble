@@ -6,17 +6,18 @@
     <title>SONG, YOUNG-MIN Guitar Lab</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #261411; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #2D1B18; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; }
         #start-btn {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            padding: 20px 40px; font-size: 18px; cursor: pointer; z-index: 1000;
-            background: #5D4037; color: #FFCC80; border: 2px solid #8D6E63; border-radius: 12px;
-            box-shadow: 0 0 20px rgba(255, 167, 38, 0.3); text-align: center;
+            padding: 22px 45px; font-size: 18px; cursor: pointer; z-index: 1000;
+            background: #5D4037; color: #D7CCC8; border: 1.5px solid #8D6E63; border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6); text-align: center; transition: 0.3s;
         }
+        #start-btn:active { background: #3E2723; transform: translate(-50%, -48%); }
     </style>
 </head>
 <body>
-    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>터치하여 연주 시작</button>
+    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>(Touch to Start)</button>
 
     <script>
         let ball, tiles, audioCtx;
@@ -27,13 +28,8 @@
 
         const config = {
             type: Phaser.AUTO,
-            backgroundColor: '#261411',
-            scale: {
-                mode: Phaser.Scale.FIT,
-                autoCenter: Phaser.Scale.CENTER_BOTH,
-                width: window.innerWidth,
-                height: window.innerHeight
-            },
+            backgroundColor: '#2D1B18',
+            scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: window.innerWidth, height: window.innerHeight },
             physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
             scene: { create: create, update: update }
         };
@@ -41,23 +37,22 @@
         const game = new Phaser.Game(config);
 
         function create() {
-            const width = this.scale.width;
-            const height = this.scale.height;
+            const { width, height } = this.scale;
             const centerX = width / 2;
             const centerY = height / 2;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // 1. 텍스처 생성
+            // 1. 텍스처 생성 (복구된 나무 질감 및 은은한 LED)
             createWoodTexture(this);
+            createSoftLEDTexture(this);
             createGlassBallTexture(this);
-            createLEDTexture(this);
 
-            // 배경
-            this.add.tileSprite(centerX, centerY, width, height, 'woodTex').setAlpha(0.2);
+            // 배경 (바닥면 나무 질감)
+            this.add.tileSprite(centerX, centerY, width, height, 'woodTex').setAlpha(0.15);
 
             // 3. 입체 블록 생성
             tiles = this.add.group();
-            const tileSize = Math.min(width, height) * 0.18;
+            const tileSize = Math.min(width, height) * 0.17;
 
             for (let i = 0; i < 12; i++) {
                 let col = i % 3;
@@ -67,15 +62,15 @@
 
                 let container = this.add.container(x, y);
 
-                // LED 불빛 (평소엔 투명)
-                let led = this.add.sprite(0, 0, 'ledGlow').setScale(2).setAlpha(0);
-                // 그림자 및 측면
-                let shadow = this.add.rectangle(5, 5, tileSize, tileSize, 0x000000, 0.4);
+                // 절제된 LED 후광
+                let led = this.add.sprite(0, 0, 'softLED').setAlpha(0).setScale(1.2);
+                // 입체감을 위한 측면/그림자
+                let shadow = this.add.rectangle(4, 4, tileSize, tileSize, 0x000000, 0.4);
                 let side = this.add.rectangle(0, 6, tileSize, tileSize, 0x3E2723);
-                // 상단 블록
+                // 질감이 살아있는 상단 블록
                 let top = this.add.sprite(0, 0, 'woodTex').setDisplaySize(tileSize, tileSize).setTint(0x8D6E63);
                 let txt = this.add.text(0, 0, notes[i], { 
-                    fontSize: (tileSize * 0.3) + 'px', color: '#2D1B18', fontStyle: 'bold' 
+                    fontSize: (tileSize * 0.28) + 'px', color: '#261411', fontStyle: 'bold', fontFamily: '맑은 고딕' 
                 }).setOrigin(0.5);
 
                 container.add([led, shadow, side, top, txt]);
@@ -86,13 +81,13 @@
                 tiles.add(container);
             }
 
-            // 4. 구슬
+            // 4. 유리구슬
             ball = this.physics.add.sprite(centerX, centerY, 'glassBall');
             ball.setCircle(25).setCollideWorldBounds(true).setBounce(0.5).setDepth(100);
 
             // 워터마크
-            this.add.text(centerX, height - 50, "SONG, YOUNG-MIN Guitar Lab", {
-                fontSize: '16px', color: '#FFCC80', alpha: 0.3
+            this.add.text(centerX, height - 40, "SONG, YOUNG-MIN Guitar Lab", {
+                fontSize: '15px', color: '#8D6E63', alpha: 0.5
             }).setOrigin(0.5);
 
             window.addEventListener('deviceorientation', (e) => {
@@ -104,47 +99,50 @@
             this.time.addEvent({ delay: 30000, callback: shuffleTiles, callbackScope: this, loop: true });
         }
 
-        // --- 텍스처 생성 함수들 ---
+        // --- 텍스처 생성 (질감 복구 및 LED 최적화) ---
         function createWoodTexture(scene) {
-            const woodG = scene.make.graphics({x: 0, y: 0, add: false});
-            woodG.fillStyle(0x8D6E63, 1).fillRect(0, 0, 200, 200);
-            for(let i=0; i<200; i+=10) {
-                woodG.lineStyle(1, 0x4E342E, 0.3);
-                woodG.lineBetween(i, 0, i + 5, 200);
+            const g = scene.make.graphics({x: 0, y: 0, add: false});
+            g.fillStyle(0x8D6E63, 1).fillRect(0, 0, 256, 256);
+            // 리얼한 나이테 선 드로잉
+            for(let i=0; i<256; i+=6) {
+                g.lineStyle(1, 0x4E342E, 0.25);
+                g.beginPath();
+                g.moveTo(i, 0);
+                g.bezierCurveTo(i + Math.random()*15, 80, i - Math.random()*15, 170, i, 256);
+                g.strokePath();
             }
-            woodG.generateTexture('woodTex', 200, 200);
+            g.generateTexture('woodTex', 256, 256);
         }
 
-        function createLEDTexture(scene) {
-            const ledG = scene.make.graphics({x: 0, y: 0, add: false});
-            // 노란색에서 투명으로 퍼지는 그라디언트 느낌
-            for(let r = 50; r > 0; r--) {
-                ledG.fillStyle(0xFFA726, (50 - r) / 500);
-                ledG.fillCircle(50, 50, r);
+        function createSoftLEDTexture(scene) {
+            const g = scene.make.graphics({x: 0, y: 0, add: false});
+            // 퍼짐이 덜하고 은은한 주황색 글로우
+            for(let r = 60; r > 0; r--) {
+                g.fillStyle(0xFF8F00, (60 - r) / 1000); // 훨씬 낮은 농도
+                g.fillCircle(64, 64, r);
             }
-            ledG.generateTexture('ledGlow', 100, 100);
+            g.generateTexture('softLED', 128, 128);
         }
 
         function createGlassBallTexture(scene) {
             const g = scene.make.graphics({x: 0, y: 0, add: false});
-            g.lineStyle(2, 0xffffff, 0.6).strokeCircle(25, 25, 23);
-            g.fillStyle(0xffffff, 0.1).fillCircle(25, 25, 23);
-            g.fillStyle(0xffffff, 0.6).fillCircle(18, 18, 8);
+            g.lineStyle(2, 0xffffff, 0.5).strokeCircle(25, 25, 23);
+            g.fillStyle(0xffffff, 0.08).fillCircle(25, 25, 23);
+            g.fillStyle(0xffffff, 0.45).fillCircle(18, 18, 7);
             g.generateTexture('glassBall', 50, 50);
         }
 
         function shuffleTiles() {
-            const centerX = this.scale.width / 2;
-            const centerY = this.scale.height / 2;
-            const tileSize = Math.min(this.scale.width, this.scale.height) * 0.18;
+            const { width, height } = this.scale;
+            const tileSize = Math.min(width, height) * 0.17;
             let pos = [];
             for (let i = 0; i < 12; i++) {
                 let col = i % 3; let row = Math.floor(i / 3);
-                pos.push({ x: centerX + (col - 1) * (tileSize * 1.35), y: centerY + (row - 1.5) * (tileSize * 1.35) });
+                pos.push({ x: (width/2) + (col - 1) * (tileSize * 1.35), y: (height/2) + (row - 1.5) * (tileSize * 1.35) });
             }
             Phaser.Actions.Shuffle(pos);
             tiles.getChildren().forEach((c, i) => {
-                this.tweens.add({ targets: c, x: pos[i].x, y: pos[i].y, duration: 1000, ease: 'Cubic.easeInOut' });
+                this.tweens.add({ targets: c, x: pos[i].x, y: pos[i].y, duration: 900, ease: 'Cubic.out' });
             });
         }
 
@@ -155,75 +153,71 @@
 
                 tiles.getChildren().forEach(container => {
                     const dist = Phaser.Math.Distance.Between(ball.x, ball.y, container.x, container.y);
-                    if (dist < 45) {
-                        if (!container.getData('isOver')) {
-                            container.setData('isOver', true);
-                            activateBlock.call(this, container);
-                        }
-                    } else if (container.getData('isOver') && dist > 55) {
+                    if (dist < 45 && !container.getData('isOver')) {
+                        container.setData('isOver', true);
+                        onPress.call(this, container);
+                    } else if (dist > 55) {
                         container.setData('isOver', false);
-                        deactivateBlock.call(this, container);
+                        onRelease.call(this, container);
                     }
                 });
             }
         }
 
-        function activateBlock(container) {
+        function onPress(container) {
             const led = container.getData('led');
             const top = container.getData('top');
-            const txt = container.getData('txt');
-
-            playFluteNote(container.getData('freq'));
-
-            this.tweens.add({ targets: led, alpha: 0.8, scale: 2.5, duration: 200 });
-            this.tweens.add({ targets: [top, txt], y: 5, duration: 100 });
-            top.setTint(0xFFCC80); // 밟았을 때 나무가 밝게 빛남
+            playFlute(container.getData('freq'));
+            this.tweens.add({ targets: led, alpha: 0.6, duration: 150 });
+            this.tweens.add({ targets: [top, container.getData('txt')], y: 5, duration: 80 });
+            top.setTint(0xA1887F);
         }
 
-        function deactivateBlock(container) {
+        function onRelease(container) {
             const led = container.getData('led');
             const top = container.getData('top');
-            const txt = container.getData('txt');
-
-            this.tweens.add({ targets: led, alpha: 0, scale: 2, duration: 500 });
-            this.tweens.add({ targets: [top, txt], y: 0, duration: 200 });
+            this.tweens.add({ targets: led, alpha: 0, duration: 400 });
+            this.tweens.add({ targets: [top, container.getData('txt')], y: 0, duration: 150 });
             top.setTint(0x8D6E63);
         }
 
-        // --- 플루트 음색 합성 함수 ---
-        function playFluteNote(freq) {
+        // --- 내추럴 플루트 합성 (개선 버전) ---
+        function playFlute(freq) {
             if (!audioCtx) return;
             const now = audioCtx.currentTime;
             
-            // 기본파 + 배음 (플루트의 맑은 소리 구현)
-            const oscs = [1, 2, 3]; // 기본 주파수와 옥타브 배음들
-            const gains = [0.15, 0.05, 0.02]; // 배음의 세기
+            // 배음을 더 세밀하게 조정하여 '목관' 느낌 강화
+            const harmonics = [
+                { mul: 1.0, gain: 0.12, type: 'sine' },
+                { mul: 2.0, gain: 0.04, type: 'sine' },
+                { mul: 3.0, gain: 0.02, type: 'sine' },
+                { mul: 4.0, gain: 0.01, type: 'sine' }
+            ];
 
-            oscs.forEach((mul, i) => {
+            harmonics.forEach(h => {
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
+                osc.type = h.type;
+                osc.frequency.setValueAtTime(freq * h.mul, now);
                 
-                osc.type = (i === 0) ? 'sine' : 'sine'; // 부드러운 사인파 기반
-                osc.frequency.setValueAtTime(freq * mul, now);
-                
-                // 비브라토 추가 (플루트의 떨림)
-                const vibrato = audioCtx.createOscillator();
-                const vibratoGain = audioCtx.createGain();
-                vibrato.frequency.setValueAtTime(5, now); // 5Hz 떨림
-                vibratoGain.gain.setValueAtTime(freq * 0.005, now);
-                vibrato.connect(vibratoGain);
-                vibratoGain.connect(osc.frequency);
-                vibrato.start();
+                // 비브라토 (약간 불규칙하게 셋팅하여 자연스럽게)
+                const lfo = audioCtx.createOscillator();
+                const lfoGain = audioCtx.createGain();
+                lfo.frequency.setValueAtTime(4.8 + Math.random(), now); 
+                lfoGain.gain.setValueAtTime(freq * 0.004, now);
+                lfo.connect(lfoGain);
+                lfoGain.connect(osc.frequency);
+                lfo.start();
 
-                // 엔벨로프 (부드러운 시작과 끝)
+                // 엠벨로프 (플루트의 '후~' 하는 호흡 느낌)
                 gain.gain.setValueAtTime(0, now);
-                gain.gain.linearRampToValueAtTime(gains[i], now + 0.1); // Attack
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2); // Release
+                gain.gain.linearRampToValueAtTime(h.gain, now + 0.12); // 부드러운 시작
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4); // 긴 여운
                 
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start();
-                osc.stop(now + 1.3);
+                osc.stop(now + 1.5);
             });
         }
 
@@ -231,15 +225,9 @@
             baseBeta = null;
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(state => {
-                    if (state === 'granted') {
-                        audioCtx.resume();
-                        this.style.display = 'none';
-                    }
+                    if (state === 'granted') { audioCtx.resume(); this.style.display = 'none'; }
                 });
-            } else {
-                audioCtx.resume();
-                this.style.display = 'none';
-            }
+            } else { audioCtx.resume(); this.style.display = 'none'; }
         };
     </script>
 </body>

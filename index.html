@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>SONG, YOUNG-MIN Guitar Lab</title>
+    <title>SONG,YOUNG-MIN Guitar Lab</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
     <style>
         /* 기본 배경색 및 전체 화면 설정 */
@@ -18,7 +18,7 @@
     </style>
 </head>
 <body>
-    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>터치하여 연주 시작</button>
+    <button id="start-btn">SONG,YOUNG-MIN Guitar Lab<br>터치하여 연주 시작</button>
 
     <script>
         // 전역 변수 선언: 구슬, 블록그룹, 오디오컨텍스트, 리버브 전송 통로 등
@@ -101,7 +101,7 @@
             ball.setCircle(38).setCollideWorldBounds(true).setBounce(0.5).setDepth(100); // 원형 충돌, 튕김 설정
 
             // 5. 워터마크 하단 배치
-            this.add.text(centerX, height - 40, "SONG, YOUNG-MIN Guitar Lab", {
+            this.add.text(centerX, height - 40, "SONG,YOUNG-MIN Guitar Lab", {
                 fontSize: '18px', color: '#ffffff', alpha: 0.5, fontStyle: 'bold'
             }).setOrigin(0.5);
 
@@ -184,7 +184,7 @@
                 // 비브라토(떨림) 구현
                 const lfo = audioCtx.createOscillator(); // 저주파 발생기
                 const lfoGain = audioCtx.createGain();
-                lfo.frequency.setValueAtTime(4.5, now); // 초당 4.5번 떨림
+                lfo.frequency.setValueAtTime(3, now); // 초당 3번 떨림
                 lfoGain.gain.setValueAtTime(freq * 0.004, now); // 떨림의 폭 설정
                 lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
                 lfo.start();

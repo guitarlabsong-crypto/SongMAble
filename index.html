@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>SONG, YOUNG-MIN Guitar Lab</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
     <style>
@@ -10,125 +10,142 @@
         #start-btn {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             padding: 20px 40px; font-size: 18px; cursor: pointer; z-index: 100;
-            background: #5D4037; color: #D7CCC8; border: 2px solid #8D6E63; border-radius: 5px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            background: #5D4037; color: #D7CCC8; border: 2px solid #8D6E63; border-radius: 8px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-align: center;
         }
     </style>
 </head>
 <body>
-    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab</button>
+    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>(Touch to Start)</button>
 
     <script>
-        const config = {
-            type: Phaser.AUTO,
-            width: window.innerWidth,
-            height: window.innerHeight,
-            physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
-            scene: { create: create, update: update }
-        };
-
+        // --- 전역 설정 및 변수 ---
         let ball, tiles, audioCtx;
         let accelX = 0, accelY = 0, baseBeta = null;
 
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const freqs = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
 
+        const config = {
+            type: Phaser.AUTO,
+            scale: {
+                mode: Phaser.Scale.RESIZE, // 3. 가변 비율 대응
+                parent: document.body,
+                width: '100%',
+                height: '100%'
+            },
+            physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
+            scene: { preload: preload, create: create, update: update }
+        };
+
         const game = new Phaser.Game(config);
 
+        function preload() {}
+
         function create() {
-            const centerX = this.cameras.main.centerX;
-            const centerY = this.cameras.main.centerY;
+            const { width, height } = this.scale;
+            const centerX = width / 2;
+            const centerY = height / 2;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // 1. 배경 (나이테 질감 추가)
-            const bg = this.add.graphics();
-            bg.fillGradientStyle(0x3E2723, 0x3E2723, 0x2D1B18, 0x2D1B18, 1);
-            bg.fillRect(0, 0, config.width, config.height);
-            bg.lineStyle(1, 0x261411, 0.5);
-            for(let i=0; i<config.width; i+=20) { bg.lineBetween(i, 0, i, config.height); }
+            // 1. 나이테 텍스처 생성 (나무 질감 입히기)
+            createWoodTexture(this);
+            createGlassBallTexture(this);
 
-            // 2. 투명 유리구슬 텍스처
-            const glass = this.make.graphics({x: 0, y: 0, add: false});
-            glass.lineStyle(2, 0xffffff, 0.5).strokeCircle(25, 25, 23);
-            glass.fillStyle(0xffffff, 0.1).fillCircle(25, 25, 23);
-            glass.fillStyle(0xffffff, 0.4).fillCircle(18, 18, 7);
-            glass.generateTexture('glassBall', 50, 50);
+            // 배경 바닥
+            this.add.tileSprite(centerX, centerY, width, height, 'woodTexture').setAlpha(0.3);
 
-            // 3. 입체 나무 블록 컨테이너 생성
+            // 3. 입체 블록 생성
             tiles = this.add.group();
-            const tileSize = 85;
-            const depth = 8; // 블록의 두께(높이)
+            const tileSize = Math.min(width, height) * 0.18; // 화면 크기에 따른 가변 블록 크기
 
             for (let i = 0; i < 12; i++) {
                 let col = i % 3;
                 let row = Math.floor(i / 3);
-                let x = centerX + (col - 1) * (tileSize + 35);
-                let y = centerY + (row - 1.5) * (tileSize + 35);
+                let x = centerX + (col - 1) * (tileSize * 1.3);
+                let y = centerY + (row - 1.5) * (tileSize * 1.3);
 
                 let container = this.add.container(x, y);
 
-                // 그림자 (맨 아래)
-                let shadow = this.add.rectangle(4, 4, tileSize, tileSize, 0x000000, 0.3);
+                // 입체감을 위한 그림자 및 측면
+                let shadow = this.add.rectangle(5, 5, tileSize, tileSize, 0x000000, 0.4);
+                let side = this.add.rectangle(0, 6, tileSize, tileSize, 0x4E342E);
                 
-                // 블록 측면 (두께감 표현 - 어두운 색)
-                let side = this.add.rectangle(0, depth, tileSize, tileSize, 0x5D4037).setStrokeStyle(1, 0x3E2723);
-                
-                // 블록 상단 (누르는 면 - 밝은 색)
-                let top = this.add.rectangle(0, 0, tileSize, tileSize, 0x8D6E63).setStrokeStyle(2, 0x5D4037);
+                // 나이테가 그려진 상단 블록
+                let top = this.add.sprite(0, 0, 'woodTexture').setDisplaySize(tileSize, tileSize);
+                top.setTint(0x8D6E63);
                 
                 let txt = this.add.text(0, 0, notes[i], { 
-                    fontSize: '22px', color: '#3E2723', fontStyle: 'bold', fontFamily: '맑은 고딕' 
+                    fontSize: (tileSize * 0.3) + 'px', color: '#2D1B18', fontStyle: 'bold', fontFamily: '맑은 고딕' 
                 }).setOrigin(0.5);
 
                 container.add([shadow, side, top, txt]);
-                container.setData({ 
-                    freq: freqs[i], active: false, 
-                    top: top, txt: txt, shadow: shadow, depth: depth 
-                });
+                container.setData({ freq: freqs[i], isOver: false, top: top, txt: txt, shadow: shadow });
                 
                 this.physics.add.existing(container);
                 container.body.setSize(tileSize, tileSize);
                 tiles.add(container);
             }
 
-            // 4. 구슬 생성
+            // 구슬 생성
             ball = this.physics.add.sprite(centerX, centerY, 'glassBall');
-            ball.setCircle(25).setCollideWorldBounds(true).setBounce(0.4).setDepth(100);
+            ball.setCircle(25).setCollideWorldBounds(true).setBounce(0.5).setDepth(100);
 
-            // 5. 워터마크
-            this.add.text(centerX, config.height - 50, "SONG, YOUNG-MIN Guitar Lab", {
-                fontSize: '18px', color: '#ffffff', alpha: 0.4, fontFamily: '맑은 고딕'
+            // 하단 워터마크
+            this.watermark = this.add.text(centerX, height - 40, "SONG, YOUNG-MIN Guitar Lab", {
+                fontSize: '16px', color: '#ffffff', alpha: 0.4, fontFamily: '맑은 고딕'
             }).setOrigin(0.5);
 
-            // 30초 무작위 재배치
-            this.time.addEvent({ delay: 30000, callback: shuffleTiles, callbackScope: this, loop: true });
-
-            // 자이로 이벤트
+            // 자이로 센서 설정
             window.addEventListener('deviceorientation', (e) => {
                 if (baseBeta === null) baseBeta = e.beta;
                 accelX = e.gamma * 25; 
                 accelY = (e.beta - baseBeta) * 25;
             });
+
+            // 30초 셔플
+            this.time.addEvent({ delay: 30000, callback: shuffleTiles, callbackScope: this, loop: true });
+        }
+
+        // --- 1. 나무 나이테 텍스처 생성 ---
+        function createWoodTexture(scene) {
+            const canvas = scene.make.graphics({x: 0, y: 0, add: false});
+            canvas.fillStyle(0x8D6E63, 1);
+            canvas.fillRect(0, 0, 200, 200);
+            
+            // 미세 나이테 선 그리기
+            for(let i=0; i<200; i+=8) {
+                canvas.lineStyle(1, 0x5D4037, 0.3);
+                // 약간의 곡선을 주어 나이테 느낌 강화
+                canvas.beginPath();
+                canvas.moveTo(i, 0);
+                canvas.bezierCurveTo(i+10, 50, i-10, 150, i, 200);
+                canvas.strokePath();
+            }
+            canvas.generateTexture('woodTexture', 200, 200);
+        }
+
+        function createGlassBallTexture(scene) {
+            const g = scene.make.graphics({x: 0, y: 0, add: false});
+            g.lineStyle(2, 0xffffff, 0.6).strokeCircle(25, 25, 23);
+            g.fillStyle(0xffffff, 0.15).fillCircle(25, 25, 23);
+            g.fillStyle(0xffffff, 0.5).fillCircle(18, 18, 8);
+            g.generateTexture('glassBall', 50, 50);
         }
 
         function shuffleTiles() {
-            const centerX = this.cameras.main.centerX;
-            const centerY = this.cameras.main.centerY;
-            const tileSize = 85;
+            const { width, height } = this.scale;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const tileSize = Math.min(width, height) * 0.18;
             let pos = [];
             for (let i = 0; i < 12; i++) {
-                let col = i % 3;
-                let row = Math.floor(i / 3);
-                pos.push({ x: centerX + (col - 1) * (tileSize + 35), y: centerY + (row - 1.5) * (tileSize + 35) });
+                let col = i % 3; let row = Math.floor(i / 3);
+                pos.push({ x: centerX + (col - 1) * (tileSize * 1.3), y: centerY + (row - 1.5) * (tileSize * 1.3) });
             }
             Phaser.Actions.Shuffle(pos);
-
-            tiles.getChildren().forEach((container, index) => {
-                this.tweens.add({
-                    targets: container,
-                    x: pos[index].x, y: pos[index].y,
-                    duration: 1000, ease: 'Cubic.easeInOut'
-                });
+            tiles.getChildren().forEach((c, i) => {
+                this.tweens.add({ targets: c, x: pos[i].x, y: pos[i].y, duration: 1000, ease: 'Power2' });
             });
         }
 
@@ -137,38 +154,40 @@
                 ball.setVelocityX(accelX);
                 ball.setVelocityY(accelY);
 
-                this.physics.overlap(ball, tiles, (b, container) => {
-                    if (!container.getData('active')) {
-                        container.setData('active', true);
-                        pressButton.call(this, container);
+                // 2. 밟을 때만 1번 소리 나도록 하는 로직
+                tiles.getChildren().forEach(container => {
+                    const bounds = container.getBounds();
+                    const isTouching = Phaser.Geom.Intersects.CircleToRectangle(ball.body, bounds);
+
+                    if (isTouching) {
+                        if (!container.getData('isOver')) {
+                            // 처음 밟는 순간
+                            container.setData('isOver', true);
+                            pressButton.call(this, container);
+                        }
+                        // 밟고 있는 동안은 아무 일도 하지 않음 (소리 안 남)
+                    } else {
+                        // 블록을 완전히 벗어났을 때 상태 초기화
+                        container.setData('isOver', false);
                     }
                 });
             }
         }
 
-        // --- 입체 버튼 누름 애니메이션 ---
         function pressButton(container) {
-            const top = container.getData('top');
-            const txt = container.getData('txt');
-            const shadow = container.getData('shadow');
-            const depth = container.getData('depth');
+            const top = container.getAt(2); // 상단 블록 레이어
+            const txt = container.getAt(3);
+            const shadow = container.getAt(0);
 
             playNote(container.getData('freq'));
 
             this.tweens.add({
                 targets: [top, txt],
-                y: depth - 2, // 측면 높이만큼 내려가서 '눌림' 표현
-                duration: 80,
+                y: 4, // 쑥 들어감
+                duration: 100,
                 yoyo: true,
-                ease: 'Quad.easeOut',
-                onUpdate: () => {
-                    // 눌릴 때 그림자도 흐릿해짐
-                    shadow.alpha = 0.1;
-                },
-                onComplete: () => {
-                    container.setData('active', false);
-                    shadow.alpha = 0.3;
-                }
+                onStart: () => { shadow.setAlpha(0.1); },
+                onComplete: () => { shadow.setAlpha(0.4); }
             });
         }
 
@@ -178,7 +197,7 @@
             const gain = audioCtx.createGain();
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
             osc.connect(gain);
             gain.connect(audioCtx.destination);
@@ -191,12 +210,12 @@
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(state => {
                     if (state === 'granted') {
-                        if (audioCtx) audioCtx.resume();
+                        audioCtx.resume();
                         this.style.display = 'none';
                     }
                 });
             } else {
-                if (audioCtx) audioCtx.resume();
+                audioCtx.resume();
                 this.style.display = 'none';
             }
         };

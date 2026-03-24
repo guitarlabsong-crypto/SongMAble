@@ -3,179 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SONG, YOUNG-MIN Guitar Lab - Wooden Aleatoric Instrument</title>
+    <title>SONG, YOUNG-MIN Guitar Lab</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
     <style>
-        /* 1. 전체 배경을 어두운 나무색으로 설정 */
-        body { margin: 0; overflow: hidden; background-color: #3E2723; font-family: 'Malgun Gothic', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #4E342E; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; }
         #start-btn {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             padding: 20px 40px; font-size: 18px; cursor: pointer; z-index: 100;
-            background: #5D4037; color: #D7CCC8; border: 2px solid #8D6E63; border-radius: 5px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-            font-family: '"Malgun Gothic", "맑은 고딕", sans-serif'; /* 버튼에도 맑은 고딕 적용 */
+            background: #8D6E63; color: white; border: 2px solid #3E2723; border-radius: 10px;
+            font-family: inherit;
         }
     </style>
 </head>
 <body>
-    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab</button>
+    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>(터치하여 시작)</button>
 
     <script>
-        // --- 게임 설정 ---
         const config = {
             type: Phaser.AUTO,
             width: window.innerWidth,
             height: window.innerHeight,
+            backgroundColor: '#3E2723', // 배경 유실 대비 기본색
             physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
-            scene: { preload: preload, create: create, update: update }
+            scene: { create: create, update: update }
         };
 
         let ball, tiles, audioCtx;
         let accelX = 0, accelY = 0;
-        const game = new Phaser.Game(config);
-
-        // 12음계 및 주파수 정의
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const freqs = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
 
-        function preload() {}
+        const game = new Phaser.Game(config);
 
         function create() {
             const centerX = this.cameras.main.centerX;
             const centerY = this.cameras.main.centerY;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // 1, 3. 리얼한 배경 및 쇠구슬 텍스처 생성 함수 호출
-            createWoodTextures.call(this);
-            createSilverBallTexture.call(this);
+            // --- 1. 나무 바닥 질감 직접 그리기 ---
+            const graphics = this.add.graphics();
+            graphics.fillGradientStyle(0x4E342E, 0x4E342E, 0x2D1B18, 0x2D1B18, 1);
+            graphics.fillRect(0, 0, config.width, config.height);
+            // 나이테/판자 결 표현
+            graphics.lineStyle(2, 0x3E2723, 0.5);
+            for(let i=0; i<config.width; i+=40) { graphics.lineBetween(i, 0, i, config.height); }
 
-            // 1. 나무 바닥 배경 그리기 (미세한 나이테 패턴 적용)
-            this.add.tileSprite(centerX, centerY, window.innerWidth, window.innerHeight, 'woodFloorTexture');
+            // --- 2. 쇠구슬 은색 그라디언트 텍스처 생성 ---
+            const ballCanvas = this.make.graphics({x: 0, y: 0, add: false});
+            ballCanvas.fillStyle(0xdddddd, 1);
+            ballCanvas.fillCircle(25, 25, 25);
+            // 은색 광택(그라디언트 대용 하이라이트)
+            ballCanvas.fillStyle(0xffffff, 0.8);
+            ballCanvas.fillCircle(15, 15, 8); 
+            ballCanvas.lineStyle(2, 0x888888, 1);
+            ballCanvas.strokeCircle(25, 25, 25);
+            ballCanvas.generateTexture('silverBall', 50, 50);
 
-            // 4. 나무 버튼 그룹 생성
+            // --- 3. 나무 블럭 버튼 배치 ---
             tiles = this.add.group();
-            const tileSize = 85;
-
+            const tileSize = 80;
             for (let i = 0; i < 12; i++) {
                 let col = i % 3;
                 let row = Math.floor(i / 3);
-                let x = centerX + (col - 1) * (tileSize + 30);
-                let y = centerY + (row - 1.5) * (tileSize + 30);
+                let x = centerX + (col - 1) * (tileSize + 25);
+                let y = centerY + (row - 1.5) * (tileSize + 25);
 
-                // 버튼 하단 (눌렸을 때 보이는 그림자 구멍)
-                let shadow = this.add.rectangle(x, y + 5, tileSize, tileSize, 0x1A0F0D);
-                
-                // 1. 나무 버튼 본체 (Top) - 질감 텍스처 적용
-                let top = this.add.sprite(x, y, 'woodBlockTexture').setInteractive();
-                top.setDisplaySize(tileSize, tileSize);
-                
+                // 나무 블럭 본체
+                let block = this.add.rectangle(x, y, tileSize, tileSize, 0x8D6E63).setStrokeStyle(4, 0x5D4037);
                 let txt = this.add.text(x, y, notes[i], { 
-                    fontSize: '22px', 
-                    color: '#3E2723', 
-                    fontStyle: 'bold',
-                    fontFamily: '"Malgun Gothic", "맑은 고딕", sans-serif'
+                    fontSize: '20px', color: '#3E2723', fontStyle: 'bold', fontFamily: '맑은 고딕' 
                 }).setOrigin(0.5);
 
-                // 데이터 저장 및 물리 적용을 위한 보이지 않는 센서
-                top.setData({ freq: freqs[i], note: notes[i], active: false, shadow: shadow, text: txt });
-                tiles.add(top);
+                block.setData({ freq: freqs[i], active: false, text: txt });
+                tiles.add(block);
             }
 
-            // 5. 쇠구슬 물리 설정 - 은색 구슬 텍스처 적용
+            // --- 4. 쇠구슬 물리 설정 (중앙 배치) ---
             ball = this.physics.add.sprite(centerX, centerY, 'silverBall');
             ball.setCircle(25);
             ball.setCollideWorldBounds(true);
-            ball.setBounce(0.3); // 금속의 묵직한 반발력
-            ball.setDrag(150);   // 나무 위에서의 마찰력
+            ball.setBounce(0.3);
+            ball.setDrag(100);
             ball.setDamping(true);
-            ball.setDepth(10);   // 구슬이 버튼보다 항상 위에 있도록 설정
+            ball.setDepth(10);
 
-            // 2. 워터마크 설정 (중앙 하단 배치, 맑은 고딕)
-            this.add.text(centerX, window.innerHeight - 40, "SONG, YOUNG-MIN Guitar Lab", {
-                fontSize: '18px', 
-                color: '#ffffff', 
-                alpha: 0.5, 
-                fontFamily: '"Malgun Gothic", "맑은 고딕", sans-serif'
-            }).setOrigin(0.5); // 가운데 정렬
+            // --- 5. 워터마크 (중앙 하단) ---
+            this.add.text(centerX, config.height - 50, "SONG, YOUNG-MIN Guitar Lab", {
+                fontSize: '16px', color: '#ffffff', alpha: 0.5, fontFamily: '맑은 고딕'
+            }).setOrigin(0.5);
 
-            // 7. 30초마다 조용히 재배치 (셔플 텍스트 제거)
-            this.time.addEvent({
-                delay: 30000,
-                callback: shuffleTiles,
-                callbackScope: this,
-                loop: true
-            });
+            // 30초 셔플 타이머
+            this.time.addEvent({ delay: 30000, callback: shuffleTiles, callbackScope: this, loop: true });
 
-            // 자이로 센서 데이터 수신
+            // 자이로 센서 핸들러
             window.addEventListener('deviceorientation', (e) => {
-                accelX = e.gamma * 45; // 가속도 민감도 조절
-                accelY = (e.beta - 45) * 45; // 사용자가 폰을 비스듬히 들고 있는 각도(45도) 고려
+                // 평평하게 들었을 때를 기준(0)으로 가속도 계산
+                accelX = e.gamma * 40; 
+                accelY = (e.beta - 45) * 40; // 45도 각도로 들고 있다고 가정
             });
         }
 
-        // --- 1. 나무 질감 텍스처 생성 함수 ---
-        function createWoodTextures() {
-            // 배경 나무 바닥 텍스처
-            const floorCanvas = this.make.graphics({x: 0, y: 0, add: false});
-            floorCanvas.fillGradientStyle(0x4E342E, 0x4E342E, 0x3E2723, 0x3E2723, 1);
-            floorCanvas.fillRect(0, 0, 200, 200);
-            floorCanvas.lineStyle(1, 0x2D1B18, 0.4);
-            for(let i=0; i<200; i+=10) { floorCanvas.lineBetween(i, 0, i, 200); } // 미세 나이테 선
-            floorCanvas.generateTexture('woodFloorTexture', 200, 200);
-            floorCanvas.destroy();
-
-            // 나무 블럭 버튼 텍스처
-            const blockCanvas = this.make.graphics({x: 0, y: 0, add: false});
-            blockCanvas.fillGradientStyle(0x8D6E63, 0x8D6E63, 0x5D4037, 0x5D4037, 1);
-            blockCanvas.fillRect(0, 0, 100, 100);
-            blockCanvas.lineStyle(2, 0x5D4037, 1);
-            blockCanvas.strokeRect(0, 0, 100, 100); // 블럭 테두리
-            blockCanvas.lineStyle(1, 0x3E2723, 0.3);
-            for(let i=0; i<100; i+=8) { blockCanvas.lineBetween(i, 2, i, 98); } // 블럭 위 나이테 패턴
-            blockCanvas.generateTexture('woodBlockTexture', 100, 100);
-            blockCanvas.destroy();
-        }
-
-        // --- 3. 은색 그라디언트 쇠구슬 텍스처 생성 함수 ---
-        function createSilverBallTexture() {
-            const ballCanvas = this.make.graphics({x: 0, y: 0, add: false});
-            // 완전한 은색(Silver) 계열의 다단계 그라디언트 적용
-            ballCanvas.fillGradientStyle(0xffffff, 0xe0e0e0, 0xc0c0c0, 0x9e9e9e, 1);
-            ballCanvas.fillCircle(25, 25, 25);
-            // 상단 하이라이트 및 반사광 추가
-            ballCanvas.lineStyle(2, 0xffffff, 0.6); 
-            ballCanvas.strokeCircle(25, 25, 25);
-            ballCanvas.fillStyle(0xffffff, 0.4);
-            ballCanvas.fillCircle(18, 18, 8); // 하이라이트 스팟
-            ballCanvas.generateTexture('silverBall', 50, 50);
-            ballCanvas.destroy();
-        }
-
-        // --- 음계 타일 무작위 재배치 함수 ---
         function shuffleTiles() {
             const centerX = this.cameras.main.centerX;
             const centerY = this.cameras.main.centerY;
-            const tileSize = 85;
-            
-            let positions = [];
+            const tileSize = 80;
+            let pos = [];
             for (let i = 0; i < 12; i++) {
                 let col = i % 3;
                 let row = Math.floor(i / 3);
-                positions.push({ x: centerX + (col - 1) * (tileSize + 30), y: centerY + (row - 1.5) * (tileSize + 30) });
+                pos.push({ x: centerX + (col - 1) * (tileSize + 25), y: centerY + (row - 1.5) * (tileSize + 25) });
             }
-            Phaser.Actions.Shuffle(positions);
+            Phaser.Actions.Shuffle(pos);
 
-            let allTiles = tiles.getChildren();
-            allTiles.forEach((tile, index) => {
-                const shadow = tile.getData('shadow');
-                const text = tile.getData('text');
-                
+            tiles.getChildren().forEach((tile, index) => {
                 this.tweens.add({
-                    targets: [tile, shadow, text],
-                    x: positions[index].x,
-                    y: (target) => target === shadow ? positions[index].y + 5 : positions[index].y,
-                    duration: 1500, // 부드럽게 이동
-                    ease: 'Expo.easeInOut'
+                    targets: [tile, tile.getData('text')],
+                    x: pos[index].x, y: pos[index].y,
+                    duration: 1000, ease: 'Power2'
                 });
             });
         }
@@ -185,55 +129,38 @@
                 ball.setAccelerationX(accelX);
                 ball.setAccelerationY(accelY);
 
-                // 구슬이 나무 버튼 위에 있는지 체크 (Overlap)
+                // 구슬이 타일 위에 있는지 거리 체크
                 tiles.getChildren().forEach(tile => {
-                    let distance = Phaser.Math.Distance.Between(ball.x, ball.y, tile.x, tile.y);
-                    // 구슬이 타일 안으로 들어오면 버튼을 누름
-                    if (distance < 45 && !tile.getData('active')) {
+                    let dist = Phaser.Math.Distance.Between(ball.x, ball.y, tile.x, tile.y);
+                    if (dist < 40 && !tile.getData('active')) {
                         tile.setData('active', true);
-                        pressButton.call(this, tile);
+                        
+                        // 버튼 눌림 애니메이션
+                        this.tweens.add({
+                            targets: [tile, tile.getData('text')],
+                            scale: 0.9, y: '+=4', duration: 100, yoyo: true,
+                            onStart: () => playNote(tile.getData('freq')),
+                            onComplete: () => tile.setData('active', false)
+                        });
                     }
                 });
             }
         }
 
-        // --- 물리적 버튼 동작 애니메이션 ---
-        function pressButton(tile) {
-            const text = tile.getData('text');
-            
-            this.tweens.add({
-                targets: [tile, text],
-                y: '+=5', // 아래로 눌림
-                scale: 0.95, // 살짝 작아짐
-                duration: 80,
-                yoyo: true, // 다시 튀어나옴
-                onStart: () => playNote(tile.getData('freq')), // 밟는 순간 소리 재생
-                onComplete: () => {
-                    tile.setData('active', false);
-                }
-            });
-        }
-
-        // --- Web Audio API를 이용한 기타 톤의 부드러운 소리 ---
         function playNote(freq) {
             if (!audioCtx) return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            
-            osc.type = 'triangle'; // 나무의 따뜻한 느낌을 위한 트라이앵글파
+            osc.type = 'triangle';
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            
-            gain.gain.setValueAtTime(0, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05); // 어택
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8); // 릴리즈
-            
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             osc.start();
-            osc.stop(audioCtx.currentTime + 1);
+            osc.stop(audioCtx.currentTime + 0.6);
         }
 
-        // 센서 및 오디오 권한 버튼 이벤트
         document.getElementById('start-btn').onclick = function() {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(state => {

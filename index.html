@@ -20,9 +20,8 @@
 
     <script>
         let ball, tiles, audioCtx, reverbBus;
-        // 영점 조절을 위해 X, Y축 초기 기준값을 담을 변수 추가
         let accelX = 0, accelY = 0;
-        let baseX = null, baseY = null; 
+        let baseX = null, baseY = null; // 영점 조절용 기준 변수
 
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const freqs = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
@@ -210,11 +209,11 @@
 
         function initSensor() {
             window.addEventListener('deviceorientation', (e) => {
-                // [영점 조절 핵심] 버튼을 누른 순간의 gamma(좌우)와 beta(상하)를 기준값으로 고정
+                // 시작 버튼을 누를 때의 각도(상하좌우 모두)를 0으로 강제 세팅
                 if (baseX === null) baseX = e.gamma;
                 if (baseY === null) baseY = e.beta;
 
-                // 현재 각도에서 기준값을 빼서 "변화된 양"만 속도에 반영
+                // 세워진 상태(예: beta 90도)에서 시작해도 현재 각도와의 차이만 계산하므로 0점이 유지됨
                 accelX = (e.gamma - baseX) * 25; 
                 accelY = (e.beta - baseY) * 25;
             });

@@ -6,7 +6,6 @@
     <title>SONG, YOUNG-MIN Guitar Lab</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
     <style>
-        /* 나무 바닥 느낌의 배경색 */
         body { margin: 0; overflow: hidden; background-color: #3E2723; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; }
         #start-btn {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -43,33 +42,33 @@
             const centerY = this.cameras.main.centerY;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // 1. 나무 바닥 배경 (단순하고 명확한 드로잉)
+            // 1. 나무 바닥 배경 및 질감 (나이테 패턴)
             const bg = this.add.graphics();
-            bg.fillStyle(0x4E342E, 1);
+            bg.fillGradientStyle(0x4E342E, 0x4E342E, 0x3E2723, 0x3E2723, 1);
             bg.fillRect(0, 0, config.width, config.height);
-            bg.lineStyle(1, 0x3E2723, 0.5);
-            for(let i=0; i<config.width; i+=40) { bg.lineBetween(i, 0, i, config.height); }
+            bg.lineStyle(1, 0x2D1B18, 0.4);
+            for(let i=0; i<config.width; i+=15) { bg.lineBetween(i, 0, i, config.height); }
 
-            // 2. 투명 유리구슬 테두리 및 광택 생성
+            // 2. 투명 유리구슬 텍스처 (Alpha 적용으로 배경 투과)
             const glassCanvas = this.make.graphics({x: 0, y: 0, add: false});
-            glassCanvas.lineStyle(2, 0xffffff, 0.8); // 외곽선
-            glassCanvas.strokeCircle(25, 25, 24);
-            glassCanvas.fillStyle(0xffffff, 0.2); // 내부 투명도
-            glassCanvas.fillCircle(25, 25, 24);
-            glassCanvas.fillStyle(0xffffff, 0.6); // 상단 반사광
+            glassCanvas.lineStyle(2, 0xffffff, 0.7); 
+            glassCanvas.strokeCircle(25, 25, 23);
+            glassCanvas.fillStyle(0xffffff, 0.15); // 투명한 느낌
+            glassCanvas.fillCircle(25, 25, 23);
+            glassCanvas.fillStyle(0xffffff, 0.6); // 빛 반사광
             glassCanvas.fillCircle(18, 18, 8);
             glassCanvas.generateTexture('glassBall', 50, 50);
 
-            // 3. 나무 블럭 버튼 배치
+            // 3. 나무 버튼 타일 생성
             tiles = this.physics.add.staticGroup();
-            const tileSize = 80;
+            const tileSize = 85;
             for (let i = 0; i < 12; i++) {
                 let col = i % 3;
                 let row = Math.floor(i / 3);
                 let x = centerX + (col - 1) * (tileSize + 30);
                 let y = centerY + (row - 1.5) * (tileSize + 30);
 
-                // 나무 질감의 사각형
+                // 나무 블럭 그래픽
                 let block = this.add.rectangle(x, y, tileSize, tileSize, 0x8D6E63).setStrokeStyle(3, 0x5D4037);
                 let txt = this.add.text(x, y, notes[i], { 
                     fontSize: '22px', color: '#3E2723', fontStyle: 'bold', fontFamily: '맑은 고딕' 
@@ -79,33 +78,38 @@
                 tiles.add(block);
             }
 
-            // 4. 유리구슬 생성 (첫 코드의 물리 방식)
+            // 4. 구슬 생성 (초기 물리 로직 적용)
             ball = this.physics.add.sprite(centerX, centerY, 'glassBall');
             ball.setCircle(25);
             ball.setCollideWorldBounds(true);
             ball.setBounce(0.5);
             ball.setDepth(10);
 
-            // 5. 워터마크 (하단 정중앙 배치)
-            this.add.text(centerX, window.innerHeight - 40, "SONG, YOUNG-MIN Guitar Lab", {
+            // 5. 워터마크 (하단 정중앙, 맑은 고딕)
+            this.add.text(centerX, config.height - 40, "SONG, YOUNG-MIN Guitar Lab", {
                 fontSize: '18px', color: '#ffffff', alpha: 0.5, fontFamily: '맑은 고딕'
             }).setOrigin(0.5);
 
-            // 30초 셔플 타이머
-            this.time.addEvent({ delay: 30000, callback: shuffleTiles, callbackScope: this, loop: true });
+            // 6. 30초 무작위 재배치 타이머
+            this.time.addEvent({
+                delay: 30000,
+                callback: shuffleTiles,
+                callbackScope: this,
+                loop: true
+            });
 
-            // 자이로 센서 수신
+            // 센서 이벤트 (기본 조작 방식)
             window.addEventListener('deviceorientation', (e) => {
-                // 초기 코드처럼 직관적인 속도 변환 (gamma: 좌우, beta: 상하)
-                accelX = e.gamma * 15; 
-                accelY = (e.beta - 45) * 15; 
+                accelX = e.gamma * 18; 
+                accelY = (e.beta - 45) * 18; // 45도 들고 있는 자세 기준
             });
         }
 
+        // --- 무작위 재배치 함수 ---
         function shuffleTiles() {
             const centerX = this.cameras.main.centerX;
             const centerY = this.cameras.main.centerY;
-            const tileSize = 80;
+            const tileSize = 85;
             let pos = [];
             for (let i = 0; i < 12; i++) {
                 let col = i % 3;
@@ -119,26 +123,27 @@
                 this.tweens.add({
                     targets: [tile, txt],
                     x: pos[index].x, y: pos[index].y,
-                    duration: 1000, ease: 'Expo.easeInOut'
+                    duration: 1200,
+                    ease: 'Expo.easeInOut'
                 });
             });
         }
 
         function update() {
             if (ball) {
-                // 초기 방식: 가속도가 아닌 속도를 즉각 대입하여 빠릿한 움직임 구현
-                ball.setVelocityX(accelX * 2); 
-                ball.setVelocityY(accelY * 2);
+                // 초기 코드의 민첩한 움직임 복구
+                ball.setVelocityX(accelX * 2.5);
+                ball.setVelocityY(accelY * 2.5);
 
-                // 구슬이 타일 위에 있는지 체크 (Overlap)
+                // 버튼 눌림 판정
                 this.physics.overlap(ball, tiles, (b, tile) => {
                     if (!tile.getData('active')) {
                         tile.setData('active', true);
                         
-                        // 버튼 눌림 시각 효과
+                        // 물리적 버튼 누름 애니메이션
                         this.tweens.add({
                             targets: [tile, tile.getData('text')],
-                            scale: 0.9, y: '+=5', duration: 100, yoyo: true,
+                            scale: 0.88, y: '+=5', duration: 100, yoyo: true,
                             onStart: () => playNote(tile.getData('freq')),
                             onComplete: () => tile.setData('active', false)
                         });
@@ -147,11 +152,12 @@
             }
         }
 
+        // --- 오디오 생성 함수 ---
         function playNote(freq) {
             if (!audioCtx) return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'triangle';
+            osc.type = 'triangle'; 
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
             gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
@@ -161,16 +167,17 @@
             osc.stop(audioCtx.currentTime + 0.7);
         }
 
+        // 시작 버튼 처리
         document.getElementById('start-btn').onclick = function() {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(state => {
                     if (state === 'granted') {
-                        audioCtx.resume();
+                        if (audioCtx) audioCtx.resume();
                         this.style.display = 'none';
                     }
                 });
             } else {
-                audioCtx.resume();
+                if (audioCtx) audioCtx.resume();
                 this.style.display = 'none';
             }
         };

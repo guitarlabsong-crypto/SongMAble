@@ -6,20 +6,20 @@
     <title>SONG, YOUNG-MIN Guitar Lab</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
     <style>
+        /* 배경이 검게 변하는 것을 방지하기 위해 기본 색상 지정 */
         body { margin: 0; overflow: hidden; background-color: #3E2723; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; }
         #start-btn {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            padding: 20px 40px; font-size: 18px; cursor: pointer; z-index: 100;
-            background: #5D4037; color: #D7CCC8; border: 2px solid #8D6E63; border-radius: 8px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-align: center;
+            padding: 20px 40px; font-size: 18px; cursor: pointer; z-index: 1000;
+            background: #8D6E63; color: #ffffff; border: 2px solid #5D4037; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;
         }
     </style>
 </head>
 <body>
-    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>(Touch to Start)</button>
+    <button id="start-btn">SONG, YOUNG-MIN Guitar Lab<br>터치하여 시작</button>
 
     <script>
-        // --- 전역 설정 및 변수 ---
         let ball, tiles, audioCtx;
         let accelX = 0, accelY = 0, baseBeta = null;
 
@@ -28,36 +28,49 @@
 
         const config = {
             type: Phaser.AUTO,
+            backgroundColor: '#3E2723', // 엔진 시작 전 기본 배경색
             scale: {
-                mode: Phaser.Scale.RESIZE, // 3. 가변 비율 대응
-                parent: document.body,
-                width: '100%',
-                height: '100%'
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                width: window.innerWidth,
+                height: window.innerHeight
             },
             physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
-            scene: { preload: preload, create: create, update: update }
+            scene: { create: create, update: update }
         };
 
         const game = new Phaser.Game(config);
 
-        function preload() {}
-
         function create() {
-            const { width, height } = this.scale;
+            const width = this.scale.width;
+            const height = this.scale.height;
             const centerX = width / 2;
             const centerY = height / 2;
+            
+            // 오디오 컨텍스트 초기화 (터치 전까지 정지 상태)
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // 1. 나이테 텍스처 생성 (나무 질감 입히기)
-            createWoodTexture(this);
-            createGlassBallTexture(this);
+            // 1. 텍스처 생성 (나무 및 구슬)
+            const woodG = this.make.graphics({x: 0, y: 0, add: false});
+            woodG.fillStyle(0x8D6E63, 1).fillRect(0, 0, 200, 200);
+            for(let i=0; i<200; i+=10) {
+                woodG.lineStyle(1, 0x5D4037, 0.3);
+                woodG.lineBetween(i, 0, i + (Math.random()*10), 200);
+            }
+            woodG.generateTexture('woodTex', 200, 200);
 
-            // 배경 바닥
-            this.add.tileSprite(centerX, centerY, width, height, 'woodTexture').setAlpha(0.3);
+            const glassG = this.make.graphics({x: 0, y: 0, add: false});
+            glassG.lineStyle(2, 0xffffff, 0.6).strokeCircle(25, 25, 23);
+            glassG.fillStyle(0xffffff, 0.2).fillCircle(25, 25, 23);
+            glassG.fillStyle(0xffffff, 0.6).fillCircle(18, 18, 8);
+            glassG.generateTexture('glassBall', 50, 50);
+
+            // 2. 배경 바닥 깔기
+            this.add.tileSprite(centerX, centerY, width, height, 'woodTex').setAlpha(0.4);
 
             // 3. 입체 블록 생성
             tiles = this.add.group();
-            const tileSize = Math.min(width, height) * 0.18; // 화면 크기에 따른 가변 블록 크기
+            const tileSize = Math.min(width, height) * 0.18;
 
             for (let i = 0; i < 12; i++) {
                 let col = i % 3;
@@ -66,17 +79,11 @@
                 let y = centerY + (row - 1.5) * (tileSize * 1.3);
 
                 let container = this.add.container(x, y);
-
-                // 입체감을 위한 그림자 및 측면
                 let shadow = this.add.rectangle(5, 5, tileSize, tileSize, 0x000000, 0.4);
                 let side = this.add.rectangle(0, 6, tileSize, tileSize, 0x4E342E);
-                
-                // 나이테가 그려진 상단 블록
-                let top = this.add.sprite(0, 0, 'woodTexture').setDisplaySize(tileSize, tileSize);
-                top.setTint(0x8D6E63);
-                
+                let top = this.add.sprite(0, 0, 'woodTex').setDisplaySize(tileSize, tileSize);
                 let txt = this.add.text(0, 0, notes[i], { 
-                    fontSize: (tileSize * 0.3) + 'px', color: '#2D1B18', fontStyle: 'bold', fontFamily: '맑은 고딕' 
+                    fontSize: (tileSize * 0.3) + 'px', color: '#2D1B18', fontStyle: 'bold' 
                 }).setOrigin(0.5);
 
                 container.add([shadow, side, top, txt]);
@@ -87,57 +94,23 @@
                 tiles.add(container);
             }
 
-            // 구슬 생성
+            // 4. 구슬 생성 및 중앙 배치
             ball = this.physics.add.sprite(centerX, centerY, 'glassBall');
             ball.setCircle(25).setCollideWorldBounds(true).setBounce(0.5).setDepth(100);
 
-            // 하단 워터마크
-            this.watermark = this.add.text(centerX, height - 40, "SONG, YOUNG-MIN Guitar Lab", {
-                fontSize: '16px', color: '#ffffff', alpha: 0.4, fontFamily: '맑은 고딕'
+            // 5. 워터마크
+            this.add.text(centerX, height - 50, "SONG, YOUNG-MIN Guitar Lab", {
+                fontSize: '16px', color: '#ffffff', alpha: 0.5
             }).setOrigin(0.5);
-
-            // 자이로 센서 설정
-            window.addEventListener('deviceorientation', (e) => {
-                if (baseBeta === null) baseBeta = e.beta;
-                accelX = e.gamma * 25; 
-                accelY = (e.beta - baseBeta) * 25;
-            });
 
             // 30초 셔플
             this.time.addEvent({ delay: 30000, callback: shuffleTiles, callbackScope: this, loop: true });
         }
 
-        // --- 1. 나무 나이테 텍스처 생성 ---
-        function createWoodTexture(scene) {
-            const canvas = scene.make.graphics({x: 0, y: 0, add: false});
-            canvas.fillStyle(0x8D6E63, 1);
-            canvas.fillRect(0, 0, 200, 200);
-            
-            // 미세 나이테 선 그리기
-            for(let i=0; i<200; i+=8) {
-                canvas.lineStyle(1, 0x5D4037, 0.3);
-                // 약간의 곡선을 주어 나이테 느낌 강화
-                canvas.beginPath();
-                canvas.moveTo(i, 0);
-                canvas.bezierCurveTo(i+10, 50, i-10, 150, i, 200);
-                canvas.strokePath();
-            }
-            canvas.generateTexture('woodTexture', 200, 200);
-        }
-
-        function createGlassBallTexture(scene) {
-            const g = scene.make.graphics({x: 0, y: 0, add: false});
-            g.lineStyle(2, 0xffffff, 0.6).strokeCircle(25, 25, 23);
-            g.fillStyle(0xffffff, 0.15).fillCircle(25, 25, 23);
-            g.fillStyle(0xffffff, 0.5).fillCircle(18, 18, 8);
-            g.generateTexture('glassBall', 50, 50);
-        }
-
         function shuffleTiles() {
-            const { width, height } = this.scale;
-            const centerX = width / 2;
-            const centerY = height / 2;
-            const tileSize = Math.min(width, height) * 0.18;
+            const centerX = this.scale.width / 2;
+            const centerY = this.scale.height / 2;
+            const tileSize = Math.min(this.scale.width, this.scale.height) * 0.18;
             let pos = [];
             for (let i = 0; i < 12; i++) {
                 let col = i % 3; let row = Math.floor(i / 3);
@@ -145,29 +118,24 @@
             }
             Phaser.Actions.Shuffle(pos);
             tiles.getChildren().forEach((c, i) => {
-                this.tweens.add({ targets: c, x: pos[i].x, y: pos[i].y, duration: 1000, ease: 'Power2' });
+                this.tweens.add({ targets: c, x: pos[i].x, y: pos[i].y, duration: 800, ease: 'Power2' });
             });
         }
 
         function update() {
             if (ball) {
-                ball.setVelocityX(accelX);
-                ball.setVelocityY(accelY);
+                ball.setVelocityX(accelX * 1.5);
+                ball.setVelocityY(accelY * 1.5);
 
-                // 2. 밟을 때만 1번 소리 나도록 하는 로직
                 tiles.getChildren().forEach(container => {
-                    const bounds = container.getBounds();
-                    const isTouching = Phaser.Geom.Intersects.CircleToRectangle(ball.body, bounds);
-
-                    if (isTouching) {
+                    const distance = Phaser.Math.Distance.Between(ball.x, ball.y, container.x, container.y);
+                    // 구슬 반지름(25) + 블록 절반 크기 고려하여 타이트하게 체크
+                    if (distance < 50) {
                         if (!container.getData('isOver')) {
-                            // 처음 밟는 순간
                             container.setData('isOver', true);
                             pressButton.call(this, container);
                         }
-                        // 밟고 있는 동안은 아무 일도 하지 않음 (소리 안 남)
                     } else {
-                        // 블록을 완전히 벗어났을 때 상태 초기화
                         container.setData('isOver', false);
                     }
                 });
@@ -175,19 +143,11 @@
         }
 
         function pressButton(container) {
-            const top = container.getAt(2); // 상단 블록 레이어
+            const top = container.getAt(2);
             const txt = container.getAt(3);
-            const shadow = container.getAt(0);
-
             playNote(container.getData('freq'));
-
             this.tweens.add({
-                targets: [top, txt],
-                y: 4, // 쑥 들어감
-                duration: 100,
-                yoyo: true,
-                onStart: () => { shadow.setAlpha(0.1); },
-                onComplete: () => { shadow.setAlpha(0.4); }
+                targets: [top, txt], y: 5, duration: 80, yoyo: true
             });
         }
 
@@ -198,27 +158,45 @@
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
             gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             osc.start();
-            osc.stop(audioCtx.currentTime + 0.7);
+            osc.stop(audioCtx.currentTime + 0.6);
         }
 
-        document.getElementById('start-btn').onclick = function() {
-            baseBeta = null;
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().then(state => {
-                    if (state === 'granted') {
-                        audioCtx.resume();
-                        this.style.display = 'none';
-                    }
-                });
+        // --- 센서 및 권한 처리 ---
+        const startBtn = document.getElementById('start-btn');
+        startBtn.onclick = function() {
+            // 1. 오디오 컨텍스트 재개
+            if (audioCtx) audioCtx.resume();
+
+            // 2. 센서 권한 요청 (iOS 대응)
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            initSensor();
+                            startBtn.style.display = 'none';
+                        } else {
+                            alert('센서 권한이 거부되었습니다. 설정에서 허용해주세요.');
+                        }
+                    })
+                    .catch(console.error);
             } else {
-                audioCtx.resume();
-                this.style.display = 'none';
+                // 안드로이드 및 일반 환경
+                initSensor();
+                startBtn.style.display = 'none';
             }
         };
+
+        function initSensor() {
+            window.addEventListener('deviceorientation', (e) => {
+                if (baseBeta === null) baseBeta = e.beta;
+                accelX = e.gamma * 20; 
+                accelY = (e.beta - baseBeta) * 20;
+            });
+        }
     </script>
 </body>
 </html>

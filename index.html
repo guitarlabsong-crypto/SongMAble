@@ -20,7 +20,9 @@
 
     <script>
         let ball, tiles, audioCtx, reverbBus;
-        let accelX = 0, accelY = 0, baseBeta = null;
+        // 영점 조절을 위해 X, Y축 초기 기준값을 담을 변수 추가
+        let accelX = 0, accelY = 0;
+        let baseX = null, baseY = null; 
 
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const freqs = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
@@ -42,7 +44,6 @@
 
             setupAudio();
 
-            // 1. 나무 텍스처 생성
             const woodG = this.make.graphics({x: 0, y: 0, add: false});
             woodG.fillStyle(0x8D6E63, 1).fillRect(0, 0, 200, 200);
             for(let i=0; i<200; i+=10) {
@@ -53,7 +54,6 @@
 
             this.add.tileSprite(centerX, centerY, width, height, 'woodTex').setAlpha(0.35);
 
-            // 2. 입체 블록 생성
             tiles = this.add.group();
             const tileSize = Math.min(width, height) * 0.18;
 
@@ -75,7 +75,6 @@
                 tiles.add(container);
             }
 
-            // 3. 1.5배 커진 유리 구슬
             const glassG = this.make.graphics({x: 0, y: 0, add: false});
             glassG.lineStyle(3, 0xffffff, 0.6).strokeCircle(38, 38, 35);
             glassG.fillStyle(0xffffff, 0.15).fillCircle(38, 38, 35);
@@ -85,13 +84,11 @@
             ball = this.physics.add.sprite(centerX, centerY, 'glassBallLarge');
             ball.setCircle(38).setCollideWorldBounds(true).setBounce(0.5).setDepth(100);
 
-            // 4. 워터마크 업데이트 (두 줄 구성)
-            // 메인 브랜드명
+            // 워터마크
             this.add.text(centerX, height - 80, "SONG,YOUNG-MIN Guitar Lab", {
                 fontSize: '18px', color: '#ffffff', alpha: 0.6, fontStyle: 'bold'
             }).setOrigin(0.5);
             
-            // 서브 브랜드명 추가 (Jamsil Flute Artlounge)
             this.add.text(centerX, height - 60, "Jamsil Flute Artlounge", {
                 fontSize: '18px', color: '#FF9800', alpha: 0.7, fontStyle: 'italic'
             }).setOrigin(0.5);
@@ -106,8 +103,8 @@
             const feedback = audioCtx.createGain();
             const filter = audioCtx.createBiquadFilter();
 
-            delay.delayTime.value = 0.18; // 잔향 시간 약간 증가 (공간감 강화)
-            feedback.gain.value = 0.45;    // 잔향 피드백 증가
+            delay.delayTime.value = 0.18;
+            feedback.gain.value = 0.45;
             filter.frequency.value = 2200; 
 
             reverbBus.connect(delay);
@@ -171,14 +168,14 @@
                 
                 const lfo = audioCtx.createOscillator();
                 const lfoGain = audioCtx.createGain();
-                lfo.frequency.setValueAtTime(4.8, now); // 비브라토 속도 미세 조정
+                lfo.frequency.setValueAtTime(4.8, now);
                 lfoGain.gain.setValueAtTime(freq * 0.005, now);
                 lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
                 lfo.start();
 
                 gain.gain.setValueAtTime(0, now);
                 gain.gain.linearRampToValueAtTime(gains[i], now + 0.12);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8); // 여운을 조금 더 길게
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
                 
                 osc.connect(gain);
                 gain.connect(reverbBus);
@@ -213,9 +210,13 @@
 
         function initSensor() {
             window.addEventListener('deviceorientation', (e) => {
-                if (baseBeta === null) baseBeta = e.beta;
-                accelX = e.gamma * 25; 
-                accelY = (e.beta - baseBeta) * 25;
+                // [영점 조절 핵심] 버튼을 누른 순간의 gamma(좌우)와 beta(상하)를 기준값으로 고정
+                if (baseX === null) baseX = e.gamma;
+                if (baseY === null) baseY = e.beta;
+
+                // 현재 각도에서 기준값을 빼서 "변화된 양"만 속도에 반영
+                accelX = (e.gamma - baseX) * 25; 
+                accelY = (e.beta - baseY) * 25;
             });
         }
     </script>

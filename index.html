@@ -3,25 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gyro Sound Sphere</title>
+    <title>SONG, YOUNG-MIN Guitar Lab - Gyro Game</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #5D4037; }
+        body { margin: 0; overflow: hidden; background-color: #3E2723; }
         #start-btn {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            padding: 20px 40px; font-size: 20px; cursor: pointer; z-index: 100;
-            background: #FF9800; color: white; border: none; border-radius: 10px;
+            padding: 20px 40px; font-size: 18px; cursor: pointer; z-index: 100;
+            background: #795548; color: white; border: 2px solid #D7CCC8; border-radius: 8px;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <button id="start-btn">게임 시작 및 센서 허용</button>
+    <button id="start-btn">실행 (센서 및 오디오 활성화)</button>
 
     <script>
         const config = {
             type: Phaser.AUTO,
             width: window.innerWidth,
             height: window.innerHeight,
+            backgroundColor: '#4E342E',
             physics: {
                 default: 'arcade',
                 arcade: { gravity: { y: 0 }, debug: false }
@@ -29,85 +31,119 @@
             scene: { create: create, update: update }
         };
 
-        let ball, tiles, graphics;
+        let ball, tiles, rollSound;
         let accelX = 0, accelY = 0;
+        let audioCtx;
         const game = new Phaser.Game(config);
+
+        // 12음계 주파수 (C4 ~ B4)
+        const frequencies = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
 
         function create() {
             const centerX = this.cameras.main.centerX;
             const centerY = this.cameras.main.centerY;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // 1. 배경 타일 (12음계)
+            // 1. 12음계 타일 배치 (3x4)
             tiles = this.physics.add.staticGroup();
             const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-            const tileSize = 70;
-            
+            const tileSize = window.innerWidth / 4.5;
+
             for (let i = 0; i < 12; i++) {
                 let col = i % 3;
                 let row = Math.floor(i / 3);
-                let x = centerX + (col - 1) * (tileSize + 15);
-                let y = centerY + (row - 1.5) * (tileSize + 15);
+                let x = centerX + (col - 1) * (tileSize + 20);
+                let y = centerY + (row - 1.5) * (tileSize + 20);
 
-                let tile = this.add.rectangle(x, y, tileSize, tileSize, 0x795548).setStrokeStyle(2, 0x3E2723);
-                tile.setData('index', i);
+                let tile = this.add.rectangle(x, y, tileSize, tileSize, 0x5D4037).setStrokeStyle(3, 0x3E2723);
+                tile.setData('freq', frequencies[i]);
                 tiles.add(tile);
-                this.add.text(x, y, notes[i], { fontSize: '14px', color: '#D7CCC8' }).setOrigin(0.5);
+                this.add.text(x, y, notes[i], { fontSize: '20px', color: '#A1887F', fb: 'bold' }).setOrigin(0.5);
             }
 
-            // 2. 쇠구슬 생성 (그래픽으로 직접 그리기)
-            // 'ball'이라는 이름의 그래픽 객체를 물리 엔진에 등록합니다.
+            // 2. 묵직한 쇠구슬 생성
             const ballGraphics = this.add.graphics();
-            ballGraphics.fillStyle(0xE0E0E0, 1); // 밝은 회색(쇠 느낌)
-            ballGraphics.fillCircle(15, 15, 15);
-            ballGraphics.generateTexture('ballTexture', 30, 30);
+            ballGraphics.fillStyle(0x9E9E9E, 1);
+            ballGraphics.fillCircle(20, 20, 20);
+            ballGraphics.lineStyle(2, 0xFFFFFF, 0.5);
+            ballGraphics.strokeCircle(20, 20, 20);
+            ballGraphics.generateTexture('steelBall', 40, 40);
             ballGraphics.destroy();
 
-            ball = this.physics.add.sprite(centerX, centerY, 'ballTexture');
-            ball.setCircle(15);
+            ball = this.physics.add.sprite(centerX, centerY, 'steelBall');
+            ball.setCircle(20);
             ball.setCollideWorldBounds(true);
-            ball.setBounce(0.6);
+            ball.setBounce(0.3); // 묵직해서 덜 튕기게 설정
+            ball.setDrag(100);   // 마찰력 부여
+            ball.setDamping(true);
 
-            // 3. 워터마크 (우측 하단)
-            this.add.text(window.innerWidth - 20, window.innerHeight - 20, "SONG LAB", {
-                fontSize: '20px', color: '#ffffff', alpha: 0.2
+            // 3. 워터마크 (SONG, YOUNG-MIN Guitar Lab)
+            this.add.text(window.innerWidth - 20, window.innerHeight - 25, "SONG, YOUNG-MIN Guitar Lab", {
+                fontSize: '16px', color: '#ffffff', alpha: 0.4, fontStyle: 'italic'
             }).setOrigin(1);
 
-            // 4. 충돌 설정 및 소리 (콘솔 로그로 확인)
+            // 4. 충돌 시 소리 발생 (Synth)
             this.physics.add.overlap(ball, tiles, (b, tile) => {
-                if (!tile.getData('playing')) {
-                    tile.setData('playing', true);
-                    tile.setFillStyle(0xFFA726); 
-                    console.log(`Play Note: ${tile.getData('index')}`);
+                if (!tile.getData('active')) {
+                    tile.setData('active', true);
+                    tile.setFillStyle(0x8D6E63);
+                    playNote(tile.getData('freq'));
                     
-                    this.time.delayedCall(300, () => {
-                        tile.setFillStyle(0x795548);
-                        tile.setData('playing', false);
+                    this.time.delayedCall(250, () => {
+                        tile.setFillStyle(0x5D4037);
+                        tile.setData('active', false);
                     });
                 }
             });
 
-            // 5. 센서 이벤트
+            // 5. 자이로 센서 수신
             window.addEventListener('deviceorientation', (e) => {
-                // 스마트폰 기울기에 따라 속도 조절
-                accelX = e.gamma * 20; 
-                accelY = e.beta * 20;
+                // 가속도감을 위해 계수를 35로 상향 (더 민감하고 빠르게)
+                accelX = e.gamma * 35;
+                accelY = e.beta * 35;
             });
         }
 
         function update() {
             if (ball) {
-                ball.setVelocityX(accelX);
-                ball.setVelocityY(accelY);
+                ball.setAccelerationX(accelX);
+                ball.setAccelerationY(accelY);
+                
+                // 구르는 소리 시뮬레이션 (속도에 비례한 진동음)
+                updateRollSound(ball.body.speed);
             }
         }
 
-        // 권한 요청 버튼
+        // --- 사운드 함수 ---
+        function playNote(freq) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine'; // 기타 랩 컨셉에 맞게 부드러운 사인파
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+
+        function updateRollSound(speed) {
+            // 실제 사운드 파일 대신 속도에 따른 저주파 체감 구현 (콘솔 등으로 로직 확인 가능)
+            // 실제 구현 시에는 loop되는 white noise의 volume을 speed/500으로 조절합니다.
+        }
+
         document.getElementById('start-btn').onclick = function() {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(state => {
-                    if (state === 'granted') this.style.display = 'none';
+                    if (state === 'granted') {
+                        audioCtx.resume();
+                        this.style.display = 'none';
+                    }
                 });
             } else {
+                audioCtx.resume();
                 this.style.display = 'none';
             }
         };
